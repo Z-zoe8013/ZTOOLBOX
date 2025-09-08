@@ -25,8 +25,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
-  Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
+  // Get primary monitor work area size
+  RECT desktop_rect;
+  SystemParametersInfo(SPI_GETWORKAREA, 0, &desktop_rect, 0);
+  int screen_width = desktop_rect.right - desktop_rect.left;
+  int screen_height = desktop_rect.bottom - desktop_rect.top;
+  
+  // Set window size
+  Win32Window::Size size(380, 300);
+  
+  // Calculate position: right-aligned horizontally, centered vertically
+  unsigned int x = screen_width - size.width - 20;
+  unsigned int y = (screen_height - size.height) / 2;
+  
+  Win32Window::Point origin(x, y);
+  
   if (!window.Create(L"ztoolbox", origin, size)) {
     return EXIT_FAILURE;
   }
