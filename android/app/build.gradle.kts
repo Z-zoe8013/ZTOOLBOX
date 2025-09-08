@@ -24,7 +24,7 @@ android {
         applicationId = "com.example.ztoolbox"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 24  // Quick Settings Tile requires API 24+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -41,4 +41,11 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // OkHttp for network requests
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Kotlin Coroutines for async operations
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }

@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--网络权限 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!--快捷设置磁贴权限 -->
+    <uses-permission android:name="android.permission.BIND_QUICK_SETTINGS_TILE"/>
     <application
         android:label="ztoolbox"
         android:name="${applicationName}"
@@ -27,6 +29,24 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- 下拉控制栏快捷方式服务 -->
+        <service
+            android:name=".RefreshTileService"
+            android:exported="true"
+            android:icon="@android:drawable/ic_popup_sync"
+            android:label="云剪贴板刷新"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- 后台数据获取服务 -->
+        <service
+            android:name=".SimpleBackgroundService"
+            android:exported="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
