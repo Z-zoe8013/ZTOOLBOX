@@ -19,7 +19,7 @@ class _TextDbPageState extends State<TextDbPage> {
   @override
   void initState() {
     super.initState();
-    _getData(); // 页面初始化时加载数据
+    
   }
 
   // 更新数据（加密上传）
