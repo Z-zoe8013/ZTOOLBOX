@@ -1,16 +1,24 @@
 # ztoolbox
+-安卓版本支持从下拉快捷方式中快速复制云端数据到剪切板，无需启动应用-注意部分手机需要授权剪切板后台写入权限
+-已在小米手机完美使用
 
-A new Flutter project.
+-数据安全-上传到云的数据经过加密再上传，密钥仅在本地存储，建议设置密钥长度大于16位
 
-## Getting Started
+#应用预览图
 
-This project is a starting point for a Flutter application.
+<img width="367" height="688" alt="image" src="https://github.com/user-attachments/assets/9ecd4de4-9c1c-464e-95c0-296a7f554594" />
+<img width="363" height="686" alt="image" src="https://github.com/user-attachments/assets/76d0c012-9160-4d43-be5e-37b1dd9bbfc5" />
+<img width="386" height="884" alt="image" src="https://github.com/user-attachments/assets/d067fbd3-057e-4d7f-b7be-20ba47bad7f1" />
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+
+
+# ztoolbox 相关声明
+1. **云端服务声明**：本工具当前默认使用的云数据存储网络“https://textdb.online/”，其仅作为学习用途的临时数据存储载体，开发者已明确该服务仅供学习使用，不保证其稳定性、安全性及长期可用性。用户可根据自身需求，按照工具提供的配置方式自行修改为其他合规云服务，因选择第三方云服务产生的任何数据安全、服务质量问题，均与 ztoolbox 开发者无关。
+
+2. **知识产权声明**：若“https://textdb.online/”云服务涉及任何第三方知识产权（包括但不限于著作权、商标权、专利权等）或其他合法权益，一经相关权利人提出有效书面异议并提供充分证明材料，开发者将立即协助停止使用该云服务，并引导用户切换至其他合规服务，绝不以任何形式侵犯他人合法权益；若用户自行修改使用的第三方云服务引发知识产权纠纷，相关责任由用户自行承担，与 ztoolbox 开发者无涉。
+
+3. **数据安全提示**：用户使用 ztoolbox 存储或传输数据时，应充分认识到网络服务存在的数据泄露、丢失等潜在风险，开发者虽会采取合理技术措施保障工具本身的功能安全，但不对用户数据在云端存储、传输过程中的安全性作出绝对承诺，建议用户避免通过本工具存储、传输敏感信息（如身份证号、银行卡信息、密码等），因数据安全问题导致的任何损失，开发者不承担赔偿责任。
+
+3. **免责声明**：ztoolbox 仅为提供技术工具的软件，不对用户使用该工具所产生的任何行为后果（包括但不限于因数据使用不当引发的法律责任、因服务中断导致的损失等）承担责任，用户应自行对其使用行为及数据内容负责，确保符合《中华人民共和国网络安全法》《数据安全法》《个人信息保护法》等相关法律法规及公序良俗。
