@@ -5,27 +5,31 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.IBinder
-
+import android.util.Base64
 import android.widget.Toast
 import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
-import java.util.zip.GZIPInputStream
-import org.json.JSONObject
+import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
- * 后台数据获取服务
- * 用于在不启动前台应用的情况下获取云剪贴板数据
+ * 云剪贴板后台服务
+ * 基于textdb.online的加密云剪贴板服务
  */
 class SimpleBackgroundService : Service() {
     
     companion object {
-        private const val API_URL = "https://api.txttool.cn/netcut/note/info/"
+        private const val BASE_URL = "https://textdb.online"
+        private const val PREFS_NAME = "FlutterSharedPreferences"
+        private const val KEY_USER_ID = "flutter.textdb_use_id"
+        private const val KEY_ENCRYPTION_KEY = "flutter.encryption_key"
         
         fun startDataFetch(context: Context) {
             val intent = Intent(context, SimpleBackgroundService::class.java)
@@ -34,16 +38,27 @@ class SimpleBackgroundService : Service() {
     }
     
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var sharedPrefs: SharedPreferences
+    
+    override fun onCreate() {
+        super.onCreate()
+        sharedPrefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
     
     override fun onBind(intent: Intent?): IBinder? = null
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         serviceScope.launch {
             try {
-                val result = fetchDataWithRetry()
+                showToast("正在获取云剪贴板数据...")
+                
+                val result = fetchAndDecryptData()
                 if (result != null) {
                     copyToSystemClipboard(result)
-                    showToast("云剪贴板已刷新并复制")
+                    val preview = if (result.length > 20) "${result.take(20)}..." else result
+                    showToast("云剪贴板已刷新: $preview")
+                } else {
+                    showToast("获取数据失败，请检查网络和密钥设置")
                 }
             } catch (e: Exception) {
                 showToast("获取数据时发生错误: ${e.message}")
@@ -56,77 +71,82 @@ class SimpleBackgroundService : Service() {
     }
     
     /**
-     * 带重试机制的数据获取
+     * 获取并解密云端数据（带重试机制）
      */
-    private suspend fun fetchDataWithRetry(maxRetries: Int = 3): String? {
-        repeat(maxRetries) { attempt ->
-            val result = fetchDataWithHttpURLConnection()
-            if (result != null) {
-                return result
+    private suspend fun fetchAndDecryptData(): String? = withContext(Dispatchers.IO) {
+        try {
+            // 检查加密密钥
+            val encryptionKey = sharedPrefs.getString(KEY_ENCRYPTION_KEY, null)
+                ?: sharedPrefs.getString("encryption_key", null)
+            
+            if (encryptionKey.isNullOrEmpty()) {
+                showToast("未设置加密密钥，请先在应用中设置")
+                return@withContext null
             }
             
-            // 如果不是最后一次尝试，等待一段时间后重试
+            // 获取用户ID
+            val userId = getUserIdFromPreferences()
+            if (userId == null) {
+                showToast("未设置用户ID，请先在应用中设置")
+                return@withContext null
+            }
+            
+            return@withContext fetchAndDecryptWithUserIdAndKey(userId, encryptionKey)
+        } catch (e: Exception) {
+            showToast("处理数据时出错：${e.message}")
+            return@withContext null
+        }
+    }
+    
+    /**
+     * 从SharedPreferences获取用户ID
+     */
+    private fun getUserIdFromPreferences(): String? {
+        return sharedPrefs.getString(KEY_USER_ID, null)
+            ?: sharedPrefs.getString("textdb_use_id", null)
+    }
+
+
+    
+    /**
+     * 使用指定的用户ID和密钥获取和解密数据
+     */
+    private suspend fun fetchAndDecryptWithUserIdAndKey(userId: String, encryptionKey: String): String? {
+        val encryptedData = fetchDataWithRetry(userId)
+        return if (encryptedData.isNullOrEmpty()) null else decryptData(encryptedData, encryptionKey)
+    }
+    
+    /**
+     * 带重试机制的数据获取
+     */
+    private suspend fun fetchDataWithRetry(userId: String, maxRetries: Int = 3): String? {
+        repeat(maxRetries) { attempt ->
+            val result = fetchDataFromCloud(userId)
+            if (result != null) return result
+            
             if (attempt < maxRetries - 1) {
-                delay(2000)
+                delay(1000)
             }
         }
         
-        showToast("多次尝试后仍无法获取数据")
+        showToast("网络连接失败，请检查网络")
         return null
     }
     
     /**
-     * 使用HttpURLConnection获取数据
+     * 从textdb.online获取数据
      */
-    private suspend fun fetchDataWithHttpURLConnection(): String? = withContext(Dispatchers.IO) {
+    private suspend fun fetchDataFromCloud(userId: String): String? = withContext(Dispatchers.IO) {
         try {
-            val url = URL(API_URL)
+            val url = URL("$BASE_URL/$userId")
             val connection = url.openConnection() as HttpURLConnection
             
-            // 设置请求方法和属性
-            connection.requestMethod = "POST"
-            connection.doOutput = true
-            connection.doInput = true
+            connection.requestMethod = "GET"
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
             
-            // 设置请求头 - 完全匹配Flutter版本
-            connection.setRequestProperty("Accept", "application/json, text/javascript, */*; q=0.01")
-            connection.setRequestProperty("Accept-Encoding", "gzip, deflate, br, zstd")
-            connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6")
-            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-            connection.setRequestProperty("Origin", "https://netcut.cn")
-            connection.setRequestProperty("Referer", "https://netcut.cn/")
-            connection.setRequestProperty("Sec-Ch-Ua", "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Microsoft Edge\";v=\"140\"")
-            connection.setRequestProperty("Sec-Ch-Ua-Mobile", "?0")
-            connection.setRequestProperty("Sec-Ch-Ua-Platform", "\"Windows\"")
-            connection.setRequestProperty("Sec-Fetch-Dest", "empty")
-            connection.setRequestProperty("Sec-Fetch-Mode", "cors")
-            connection.setRequestProperty("Sec-Fetch-Site", "cross-site")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0")
-            
-            // 构建POST数据
-            val postData = "note_name=${URLEncoder.encode("1j4i6jp0n", "UTF-8")}&note_pwd=${URLEncoder.encode("1234", "UTF-8")}"
-            
-            // 发送POST数据
-            val outputWriter = OutputStreamWriter(connection.outputStream)
-            outputWriter.write(postData)
-            outputWriter.flush()
-            outputWriter.close()
-            
-            val responseCode = connection.responseCode
-            
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                // 读取响应，处理可能的gzip压缩
-                val inputStream = connection.inputStream
-                val encoding = connection.contentEncoding
-                
-                val reader = if (encoding != null && encoding.equals("gzip", ignoreCase = true)) {
-                    BufferedReader(InputStreamReader(java.util.zip.GZIPInputStream(inputStream), "UTF-8"))
-                } else {
-                    BufferedReader(InputStreamReader(inputStream, "UTF-8"))
-                }
-                
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val reader = BufferedReader(InputStreamReader(connection.inputStream))
                 val response = StringBuilder()
                 var line: String?
                 
@@ -135,40 +155,80 @@ class SimpleBackgroundService : Service() {
                 }
                 reader.close()
                 
-                val responseBody = response.toString()
+                val rawData = response.toString().trim()
                 
-                // 解析JSON
-                val jsonObject = JSONObject(responseBody)
-                val status = jsonObject.getInt("status")
-                
-                if (status == 1) {
-                    val data = jsonObject.getJSONObject("data")
-                    val noteContent = data.getString("note_content")
-                    return@withContext noteContent
-                } else {
-                    val errorMessage = jsonObject.optString("error", "未知错误")
-                    
-                    // 根据错误类型返回不同的提示
-                    when {
-                        errorMessage.contains("服务器负载过高") -> {
-                            showToast("服务器繁忙，请稍后重试")
-                        }
-                        errorMessage.contains("失效") -> {
-                            showToast("访问凭证已失效")
-                        }
-                        else -> {
-                            showToast("获取数据失败: $errorMessage")
-                        }
-                    }
-                    return@withContext null
+                return@withContext try {
+                    base64UrlSafeDecode(rawData)
+                } catch (e: Exception) {
+                    rawData
                 }
             }
             
             connection.disconnect()
         } catch (e: Exception) {
-            // 网络请求异常，静默处理
+            // 网络异常，静默处理
         }
         return@withContext null
+    }
+    
+    /**
+     * Base64 URL安全解码
+     */
+    private fun base64UrlSafeDecode(input: String): String {
+        // 恢复标准Base64格式
+        var base64 = input.replace('-', '+').replace('_', '/')
+        
+        // 补充填充字符
+        while (base64.length % 4 != 0) {
+            base64 += '='
+        }
+        
+        val bytes = Base64.decode(base64, Base64.DEFAULT)
+        return String(bytes)
+    }
+    
+    /**
+     * 解密数据
+     */
+    private fun decryptData(encryptedText: String, key: String): String? {
+        try {
+            if (encryptedText.isEmpty()) return ""
+            
+            val cleanedText = encryptedText.trim().replace(Regex("\\s+"), "")
+            val parts = cleanedText.split(":")
+            
+            if (parts.size != 2 || !isValidBase64(parts[0]) || !isValidBase64(parts[1])) {
+                throw Exception("数据格式错误")
+            }
+            
+            val iv = Base64.decode(parts[0], Base64.DEFAULT)
+            val encryptedData = Base64.decode(parts[1], Base64.DEFAULT)
+            
+            val keyBytes = key.toByteArray(Charsets.UTF_8)
+            val keyHash = MessageDigest.getInstance("SHA-256").digest(keyBytes)
+            
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyHash, "AES"), IvParameterSpec(iv))
+            
+            return String(cipher.doFinal(encryptedData), Charsets.UTF_8)
+        } catch (e: Exception) {
+            showToast("解密失败：${e.message}")
+            return null
+        }
+    }
+    
+    /**
+     * 验证Base64格式
+     */
+    private fun isValidBase64(str: String): Boolean {
+        if (str.isEmpty()) return false
+        
+        // Base64字符集检查
+        val base64Pattern = Regex("^[A-Za-z0-9+/]*={0,2}$")
+        if (!base64Pattern.matches(str)) return false
+        
+        // 长度检查
+        return str.length % 4 == 0
     }
     
     private fun copyToSystemClipboard(text: String) {

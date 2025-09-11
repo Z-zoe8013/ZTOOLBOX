@@ -32,11 +32,10 @@ class ToastUtil {
     Overlay.of(context).insert(_overlayEntry!);
     _isShowing = true;
 
-    // 设置3秒后自动移除
+    // 设置3秒后自动移除 - 修复：移除对context.mounted的依赖
     _delayRemoveTask = Future.delayed(const Duration(seconds: 3), () {
-      if (context.mounted) {
-        _removeOverlay();
-      }
+      // 直接移除覆盖层，不再检查原始上下文
+      _removeOverlay();
     });
   }
 

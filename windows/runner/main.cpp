@@ -32,8 +32,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   int screen_height = desktop_rect.bottom - desktop_rect.top;
   
   // Set window size
-  Win32Window::Size size(380, 300);
-  
+  Win32Window::Size size(380, 700);
+
   // Calculate position: right-aligned horizontally, centered vertically
   unsigned int x = screen_width - size.width - 20;
   unsigned int y = (screen_height - size.height) / 2;

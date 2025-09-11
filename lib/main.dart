@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'Cloud clipboard/index.dart';
+import 'Cloud clipboard/Cloud service/index.dart';
 
 // 应用程序入口点
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(const MyApp());
 }
 
@@ -18,7 +20,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const ClipboardPage(), // 更改主页为ClipboardPage
+      home: TextDbPage(), // 更改主页为ClipboardPage
     );
   }
 }

@@ -174,9 +174,9 @@ LRESULT CALLBACK Win32Window::WndProc(HWND const window,
 }
 
 LRESULT
-Win32Window::MessageHandler(HWND hwnd,
-                            UINT const message,
-                            WPARAM const wparam,
+Win32Window::MessageHandler(HWND hwnd, 
+                            UINT const message, 
+                            WPARAM const wparam, 
                             LPARAM const lparam) noexcept {
   switch (message) {
     case WM_DESTROY:
@@ -195,6 +195,13 @@ Win32Window::MessageHandler(HWND hwnd,
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
+      return 0;
+    }
+    case WM_GETMINMAXINFO: {
+      // Set minimum window size to 380x700
+      MINMAXINFO* minmax_info = reinterpret_cast<MINMAXINFO*>(lparam);
+      minmax_info->ptMinTrackSize.x = 380;
+      minmax_info->ptMinTrackSize.y = 700;
       return 0;
     }
     case WM_SIZE: {

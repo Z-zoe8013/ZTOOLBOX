@@ -30,19 +30,22 @@
             </intent-filter>
         </activity>
 
-        <!-- 下拉控制栏快捷方式服务 -->
+        <!-- 云剪贴板快捷磁贴服务 -->
         <service
             android:name=".RefreshTileService"
             android:exported="true"
             android:icon="@android:drawable/ic_popup_sync"
-            android:label="云剪贴板刷新"
+            android:label="云剪贴板"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
         </service>
 
-        <!-- 后台数据获取服务 -->
+        <!-- 云剪贴板后台服务 -->
         <service
             android:name=".SimpleBackgroundService"
             android:exported="false" />
