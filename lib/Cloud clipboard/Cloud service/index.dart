@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'encrypted_data_manager.dart';
 import 'key_management.dart';
-import '../prompt.dart';
-import '../glass_container.dart'; // 导入玻璃容器组件
+import '../common/prompt.dart';
+import '../common/glass_container.dart'; // 导入玻璃容器组件
 
 class TextDbPage extends StatefulWidget {
   const TextDbPage({super.key});
