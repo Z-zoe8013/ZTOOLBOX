@@ -64,7 +64,6 @@ class _FolderContentPageState extends State<FolderContentPage> {
     }
   }
 
-  // 编辑记录
   Future<void> _editRecord(ClipboardHistoryModel item) async {
     await EditRecordDrawer.show(
       context: context,
@@ -78,7 +77,7 @@ class _FolderContentPageState extends State<FolderContentPage> {
           await _service.updateHistory(
             item.id!,
             content: content,
-            favoriteType: item.favoriteType,
+            favoriteFolderId: item.favoriteFolderId,
           );
           await _loadData();
           _showMessage('保存成功');
@@ -87,19 +86,6 @@ class _FolderContentPageState extends State<FolderContentPage> {
         }
       },
     );
-  }
-
-  // 保存编辑
-  // 切换收藏状态
-  Future<void> _toggleFavorite(ClipboardHistoryModel item) async {
-    try {
-      final newFavoriteType = item.favoriteType == null ? '默认收藏夹' : null;
-      await _service.updateHistory(item.id!, favoriteType: newFavoriteType);
-      await _loadData();
-      _showMessage(item.favoriteType == null ? '已收藏' : '已取消收藏');
-    } catch (e) {
-      _showMessage('操作失败：$e');
-    }
   }
 
   // 删除项目
@@ -133,12 +119,6 @@ class _FolderContentPageState extends State<FolderContentPage> {
     }
   }
 
-  // 复制到剪贴板
-  void _copyToClipboard(String content) {
-    Clipboard.setData(ClipboardData(text: content));
-    _showMessage('已复制到剪贴板');
-  }
-
   // 新增数据
   Future<void> _addNewItem() async {
     await AddRecordDrawer.show(
@@ -156,6 +136,12 @@ class _FolderContentPageState extends State<FolderContentPage> {
     );
   }
 
+  // 复制到剪贴板
+  void _copyToClipboard(String content) {
+    Clipboard.setData(ClipboardData(text: content));
+    _showMessage('已复制到剪贴板');
+  }
+
   // 显示收藏夹管理
   void _showFavoritesManagement(BuildContext context) {
     showModalBottomSheet(
@@ -169,14 +155,20 @@ class _FolderContentPageState extends State<FolderContentPage> {
   Widget _buildStatsRow() {
     return Consumer<ClipboardProvider>(
       builder: (context, provider, child) {
+        final topPadding = MediaQuery.of(context).padding.top;
         return Container(
-          margin: const EdgeInsets.all(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                // 左侧：文件夹图标和统计信息
-                Expanded(
+          margin: EdgeInsets.only(
+            left: 16,
+            top: 16 + topPadding, // 额外加上系统状态栏高度
+            right: 16,
+            bottom: 16,
+          ),
+          child: Row(
+            children: [
+              // 左侧：文件夹图标和统计信息（点击可管理收藏夹）
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showFavoritesManagement(context),
                   child: Row(
                     children: [
                       Container(
@@ -188,7 +180,7 @@ class _FolderContentPageState extends State<FolderContentPage> {
                         child: Icon(
                           Icons.folder_special,
                           color: Colors.orange, // 橙色图标，在黑色背景下更显眼
-                          size: 24,
+                          size: 30,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -217,31 +209,22 @@ class _FolderContentPageState extends State<FolderContentPage> {
                     ],
                   ),
                 ),
-                // 右侧：操作按钮组
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 收藏夹管理按钮
-                    _buildActionButton(
-                      icon: Icons.folder_outlined,
-                      tooltip: '收藏夹管理',
-                      onPressed: () => _showFavoritesManagement(context),
-                      backgroundColor: Colors.white24, // 浅色背景
-                      iconColor: Colors.white, // 白色图标
-                    ),
-                    const SizedBox(width: 8),
-                    // 新增按钮
-                    _buildActionButton(
-                      icon: Icons.add,
-                      tooltip: '新增记录',
-                      onPressed: _addNewItem,
-                      backgroundColor: Colors.white24, // 浅色背景
-                      iconColor: Colors.white, // 白色图标
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              // 右侧：操作按钮组
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 新增按钮
+                  _buildActionButton(
+                    icon: Icons.add,
+                    tooltip: '新增记录',
+                    onPressed: _addNewItem,
+                    backgroundColor: Colors.white24, // 浅色背景
+                    iconColor: Colors.white, // 白色图标
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -272,124 +255,148 @@ class _FolderContentPageState extends State<FolderContentPage> {
     );
   }
 
+  // 长按弹出菜单
+  Future<void> _showItemMenu(
+    ClipboardHistoryModel item,
+    Offset tapPosition,
+  ) async {
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        tapPosition.dx, // 左
+        tapPosition.dy, // 上
+        tapPosition.dx + 1, // 右
+        tapPosition.dy + 1, // 下
+      ),
+      color: Color(0xFF2c2c2c), // 设置整个弹出菜单的背景颜色
+      items: [
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Text(
+            '删除',
+            style: TextStyle(color: Color(0xFFd5d5d5), fontSize: 16),
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'favorite',
+          child: Text(
+            item.favoriteFolderId != null ? '取消收藏' : '加入收藏',
+            style: TextStyle(color: Color(0xFFd5d5d5), fontSize: 16),
+          ),
+        ),
+      ],
+    );
+
+    if (selected != null) {
+      switch (selected) {
+        case 'delete':
+          await _deleteItem(item.id!);
+          break;
+        case 'favorite':
+          // 处理收藏/取消收藏逻辑
+          try {
+            if (item.favoriteFolderId != null) {
+              // 取消收藏
+              await _service.updateHistory(
+                item.id!,
+                content: item.content,
+                favoriteFolderId: null,
+              );
+              _showMessage('已取消收藏');
+            } else {
+              // 加入收藏 - 直接设置收藏夹ID为1
+              await _service.updateHistory(
+                item.id!,
+                content: item.content,
+                favoriteFolderId: 1,
+              );
+              _showMessage('已加入收藏');
+            }
+            await _loadData(); // 重新加载数据刷新界面
+          } catch (e) {
+            _showMessage('收藏操作失败：$e');
+          }
+          break;
+      }
+    }
+  }
+
   // 构建列表项
   Widget _buildListItem(ClipboardHistoryModel item) {
-    final briefContent = item.content.length > 50
-        ? '${item.content.substring(0, 50)}...'
+    final briefContent = item.content.length > 60
+        ? '${item.content.substring(0, 60)}...'
         : item.content;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 主内容区域 - 整个区域可点击展开
-            GestureDetector(
-              onTap: () => _editRecord(item),
-              child: Row(
-                children: [
-                  // 收藏按钮 - 增大点击区域
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            item.favoriteType != null
-                                ? Icons.star
-                                : Icons.star_border,
-                            color: item.favoriteType != null
-                                ? Colors.yellow
-                                : null,
-                            size: 24,
-                          ),
-                          onPressed: () => _toggleFavorite(item),
-                          tooltip: item.favoriteType != null ? '取消收藏' : '加入收藏',
-                          padding: EdgeInsets.zero,
-                        ),
-                        if (item.favoriteType != null)
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              alignment: Alignment.center,
-                              child: Text(
-                                item.favoriteType!,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        briefContent,
-                        style: const TextStyle(fontSize: 15),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    // 格式化更新时间，只显示日期和时间（不显示秒）
+    final formattedTime = item.updateTime
+        .toString()
+        .substring(0, 16)
+        .replaceAll('T', ' ');
+
+    return GestureDetector(
+      onLongPressStart: (details) {
+        _showItemMenu(item, details.globalPosition);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF191919), // 背景颜色 #191919
+          border: Border(
+            bottom: BorderSide(
+              color: const Color(0xFF333333), // 分隔线颜色 #333333
+              width: 0.5,
             ),
-            // 操作按钮区域
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => _editRecord(item),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 更新时间
-                Padding(
-                  padding: const EdgeInsets.only(left: 8, bottom: 8),
-                  child: Text(
-                    '更新时间：${item.updateTime.toString().substring(0, 19)}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                // 主内容区域
+                Text(
+                  briefContent,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFFd1d1d1), // 字体颜色 #d1d1d1
+                    height: 1.4,
                   ),
                 ),
-                // 操作按钮 - 增大点击区域
+                const SizedBox(height: 1),
+                // 底部信息行
                 Row(
                   children: [
-                    SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: IconButton(
-                        icon: const Icon(Icons.copy, size: 22),
-                        onPressed: () => _copyToClipboard(item.content),
-                        tooltip: '复制',
-                        padding: EdgeInsets.zero,
-                      ),
+                    // 收藏状态指示器
+                    if (item.favoriteFolderId != null) ...[
+                      const Icon(Icons.star, size: 16, color: Colors.orange),
+                      const SizedBox(width: 8),
+                    ],
+                    // 更新时间
+                    Text(
+                      formattedTime,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF5e5e5e),
+                      ), // 日期字体颜色 #5e5e5e
                     ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.delete,
-                          size: 22,
-                          color: Colors.red,
-                        ),
-                        onPressed: () => _deleteItem(item.id!),
-                        tooltip: '删除',
-                        padding: EdgeInsets.zero,
+                    const Spacer(),
+                    // 复制按钮
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 20),
+                      onPressed: () => _copyToClipboard(item.content),
+                      tooltip: '复制',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 26,
+                        minHeight: 26,
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -405,6 +412,7 @@ class _FolderContentPageState extends State<FolderContentPage> {
       builder: (context, provider, child) {
         return Column(
           children: [
+            //const SizedBox(height: 16),
             _buildStatsRow(),
             provider.historyList.isEmpty
                 ? Expanded(
@@ -431,7 +439,7 @@ class _FolderContentPageState extends State<FolderContentPage> {
                   )
                 : Expanded(
                     child: ListView.builder(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.zero,
                       itemCount: provider.historyList.length,
                       itemBuilder: (context, index) =>
                           _buildListItem(provider.historyList[index]),

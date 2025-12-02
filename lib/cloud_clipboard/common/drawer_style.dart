@@ -497,11 +497,22 @@ class _EditRecordDrawerContentState extends State<_EditRecordDrawerContent> {
                       // 如果选择了收藏夹，则更新记录
                       if (selectedFolder != null) {
                         try {
+                          int? folderId;
+                          if (selectedFolder.isNotEmpty) {
+                            // 查找选中的收藏夹ID
+                            final folders = await widget.service!
+                                .getAllFavoriteFolders();
+                            final folder = folders.firstWhere(
+                              (f) => f.folderName == selectedFolder,
+                              orElse: () => FavoriteFolderModel(
+                                  folderId: null, folderName: '', sortNum: 0),
+                            );
+                            folderId = folder.folderId;
+                          }
+                          
                           await widget.service!.updateHistory(
                             widget.itemId!,
-                            favoriteType: selectedFolder.isEmpty
-                                ? null
-                                : selectedFolder,
+                            favoriteFolderId: folderId,
                           );
 
                           // 显示成功消息

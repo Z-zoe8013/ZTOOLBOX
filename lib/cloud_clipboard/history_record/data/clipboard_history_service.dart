@@ -13,11 +13,11 @@ class ClipboardHistoryService {
 
   Future<int> insertHistory({
     required String content,
-    String? favoriteType,
+    int? favoriteFolderId,
   }) async {
     final history = ClipboardHistoryModel(
       content: content,
-      favoriteType: favoriteType,
+      favoriteFolderId: favoriteFolderId,
     );
     final db = await _database.database;
     return db.insert('clipboard_history', history.toMap());
@@ -45,12 +45,12 @@ class ClipboardHistoryService {
   Future<int> updateHistory(
     int id, {
     String? content,
-    String? favoriteType,
+    int? favoriteFolderId,
   }) async {
     final db = await _database.database;
     final updateData = <String, dynamic>{};
     if (content != null) updateData['content'] = content;
-    updateData['favorite_type'] = favoriteType; // 支持设置为null
+    updateData['favorite_folder_id'] = favoriteFolderId; // 支持设置为null
     updateData['update_time'] = DateTime.now().toIso8601String();
 
     return db.update(
@@ -78,6 +78,17 @@ class ClipboardHistoryService {
     return db.insert('favorite_folders', folder.toMap());
   }
 
+  /// 根据文件夹名称获取收藏夹ID
+  Future<int?> getFolderIdByName(String folderName) async {
+    final db = await _database.database;
+    final maps = await db.query(
+      'favorite_folders',
+      where: 'folder_name = ?',
+      whereArgs: [folderName],
+    );
+    return maps.isNotEmpty ? maps.first['folder_id'] as int? : null;
+  }
+
   Future<List<FavoriteFolderModel>> getAllFavoriteFolders() async {
     final db = await _database.database;
     final maps = await db.query(
@@ -93,15 +104,8 @@ class ClipboardHistoryService {
     int? sortNum,
   }) async {
     // 检查是否是默认收藏夹（默认收藏夹不能被重命名）
-    final folders = await getAllFavoriteFolders();
-    final folder = folders.firstWhere(
-      (f) => f.folderId == folderId,
-      orElse: () =>
-          FavoriteFolderModel(folderId: -1, folderName: '', sortNum: 0),
-    );
-
-    // 如果是默认收藏夹且尝试更改名称，则拒绝操作
-    if (folder.folderName == '默认' && folderName != null && folderName != '默认') {
+    // 默认收藏夹是ID为1的收藏夹
+    if (folderId == 1 && folderName != null) {
       // 不再抛出异常，而是返回-1表示操作失败
       return -1;
     }
@@ -121,15 +125,8 @@ class ClipboardHistoryService {
 
   Future<int> deleteFavoriteFolder(int folderId) async {
     // 检查是否是默认收藏夹（默认收藏夹不能被删除）
-    final folders = await getAllFavoriteFolders();
-    final folder = folders.firstWhere(
-      (f) => f.folderId == folderId,
-      orElse: () =>
-          FavoriteFolderModel(folderId: -1, folderName: '', sortNum: 0),
-    );
-
-    // 如果是默认收藏夹，则拒绝删除操作
-    if (folder.folderName == '默认') {
+    // 默认收藏夹是ID为1的收藏夹
+    if (folderId == 1) {
       // 不再抛出异常，而是返回-1表示操作失败
       return -1;
     }
@@ -142,14 +139,14 @@ class ClipboardHistoryService {
     );
   }
 
-  Future<List<ClipboardHistoryModel>> getHistoryByFavoriteType(
-    String favoriteType,
+  Future<List<ClipboardHistoryModel>> getHistoryByFavoriteFolder(
+    int folderId,
   ) async {
     final db = await _database.database;
     final maps = await db.query(
       'clipboard_history',
-      where: 'favorite_type = ?',
-      whereArgs: [favoriteType],
+      where: 'favorite_folder_id = ?',
+      whereArgs: [folderId],
       orderBy: 'update_time DESC',
     );
     return maps.map((map) => ClipboardHistoryModel.fromMap(map)).toList();
@@ -159,7 +156,7 @@ class ClipboardHistoryService {
     final db = await _database.database;
     final maps = await db.query(
       'clipboard_history',
-      where: 'favorite_type IS NULL',
+      where: 'favorite_folder_id IS NULL',
       orderBy: 'update_time DESC',
     );
     return maps.map((map) => ClipboardHistoryModel.fromMap(map)).toList();
@@ -183,7 +180,7 @@ class ClipboardHistoryService {
         : 0;
 
     final favoritedResult = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_type IS NOT NULL',
+      'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_folder_id IS NOT NULL',
     );
     final favoritedCount = favoritedResult.isNotEmpty
         ? (favoritedResult.first['count'] as int?) ?? 0
@@ -201,9 +198,9 @@ class ClipboardHistoryService {
   /// filterType 可以是：
   /// - null: 显示所有记录
   /// - "未收藏": 显示未收藏的记录
-  /// - 具体收藏夹名称: 显示该收藏夹的记录
+  /// - 具体收藏夹ID: 显示该收藏夹的记录
   Future<List<ClipboardHistoryModel>> getFilteredHistory(
-    String? filterType,
+    dynamic filterType,
   ) async {
     if (filterType == null) {
       // 显示所有记录
@@ -211,14 +208,28 @@ class ClipboardHistoryService {
     } else if (filterType == '未收藏') {
       // 显示未收藏记录
       return getUnfavoritedHistory();
-    } else {
+    } else if (filterType is int) {
       // 显示指定收藏夹记录
-      return getHistoryByFavoriteType(filterType);
+      return getHistoryByFavoriteFolder(filterType);
+    } else {
+      // 兼容旧的字符串类型的收藏夹名称
+      final folders = await getAllFavoriteFolders();
+      final folder = folders.firstWhere(
+        (f) => f.folderName == filterType,
+        orElse: () =>
+            FavoriteFolderModel(folderId: -1, folderName: '', sortNum: 0),
+      );
+
+      if (folder.folderId != -1) {
+        return getHistoryByFavoriteFolder(folder.folderId!);
+      } else {
+        return [];
+      }
     }
   }
 
   /// 获取筛选类型对应的统计数据
-  Future<Map<String, int>> getFilteredStatistics(String? filterType) async {
+  Future<Map<String, int>> getFilteredStatistics(dynamic filterType) async {
     final db = await _database.database;
 
     if (filterType == null) {
@@ -232,20 +243,40 @@ class ClipboardHistoryService {
     } else if (filterType == '未收藏') {
       // 未收藏记录统计
       final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_type IS NULL',
+        'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_folder_id IS NULL',
       );
       return {
         'count': result.isNotEmpty ? (result.first['count'] as int?) ?? 0 : 0,
       };
-    } else {
+    } else if (filterType is int) {
       // 指定收藏夹记录统计
       final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_type = ?',
+        'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_folder_id = ?',
         [filterType],
       );
       return {
         'count': result.isNotEmpty ? (result.first['count'] as int?) ?? 0 : 0,
       };
+    } else {
+      // 兼容旧的字符串类型的收藏夹名称
+      final folders = await getAllFavoriteFolders();
+      final folder = folders.firstWhere(
+        (f) => f.folderName == filterType,
+        orElse: () =>
+            FavoriteFolderModel(folderId: -1, folderName: '', sortNum: 0),
+      );
+
+      if (folder.folderId != -1) {
+        final result = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM clipboard_history WHERE favorite_folder_id = ?',
+          [folder.folderId],
+        );
+        return {
+          'count': result.isNotEmpty ? (result.first['count'] as int?) ?? 0 : 0,
+        };
+      } else {
+        return {'count': 0};
+      }
     }
   }
 
@@ -257,10 +288,10 @@ class ClipboardHistoryService {
     // 使用子查询找到需要删除的记录ID（未收藏且超出前100条的记录）
     await db.rawDelete('''
       DELETE FROM clipboard_history 
-      WHERE favorite_type IS NULL 
+      WHERE favorite_folder_id IS NULL 
       AND id NOT IN (
         SELECT id FROM clipboard_history 
-        WHERE favorite_type IS NULL 
+        WHERE favorite_folder_id IS NULL 
         ORDER BY update_time DESC 
         LIMIT 100
       )

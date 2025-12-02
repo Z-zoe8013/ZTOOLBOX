@@ -279,7 +279,7 @@ class _FavoritesManagementDrawerState extends State<FavoritesManagementDrawer> {
               ],
             ),
             onTap: () {
-              provider.selectFolder(folder.folderName);
+              provider.selectFolder(folder.folderName, folderId: folder.folderId);
               Navigator.pop(context);
             },
           ),

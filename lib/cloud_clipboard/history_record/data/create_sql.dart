@@ -99,8 +99,9 @@ class ClipboardDatabase {
         CREATE TABLE IF NOT EXISTS clipboard_history (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           content TEXT NOT NULL,
-          favorite_type VARCHAR(50) DEFAULT NULL,
-          update_time DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
+          favorite_folder_id INTEGER DEFAULT NULL,
+          update_time DATETIME NOT NULL DEFAULT (datetime('now', 'localtime')),
+          FOREIGN KEY (favorite_folder_id) REFERENCES favorite_folders(folder_id) ON DELETE SET NULL
         )
       ''');
 
@@ -108,11 +109,11 @@ class ClipboardDatabase {
       await db.execute('''
         CREATE TRIGGER IF NOT EXISTS fk_clipboard_history_insert 
         AFTER INSERT ON clipboard_history
-        WHEN NEW.favorite_type IS NOT NULL
+        WHEN NEW.favorite_folder_id IS NOT NULL
         BEGIN
           SELECT CASE
-            WHEN (SELECT folder_id FROM favorite_folders WHERE folder_name = NEW.favorite_type) IS NULL
-            THEN RAISE(ABORT, '外键约束失败：收藏夹类型不存在')
+            WHEN (SELECT folder_id FROM favorite_folders WHERE folder_id = NEW.favorite_folder_id) IS NULL
+            THEN RAISE(ABORT, '外键约束失败：收藏夹不存在')
           END;
         END;
       ''');
@@ -121,30 +122,30 @@ class ClipboardDatabase {
       await db.execute('''
         CREATE TRIGGER IF NOT EXISTS fk_clipboard_history_update 
         AFTER UPDATE ON clipboard_history
-        WHEN NEW.favorite_type IS NOT NULL AND OLD.favorite_type != NEW.favorite_type
+        WHEN NEW.favorite_folder_id IS NOT NULL AND OLD.favorite_folder_id != NEW.favorite_folder_id
         BEGIN
           SELECT CASE
-            WHEN (SELECT folder_id FROM favorite_folders WHERE folder_name = NEW.favorite_type) IS NULL
-            THEN RAISE(ABORT, '外键约束失败：收藏夹类型不存在')
+            WHEN (SELECT folder_id FROM favorite_folders WHERE folder_id = NEW.favorite_folder_id) IS NULL
+            THEN RAISE(ABORT, '外键约束失败：收藏夹不存在')
           END;
         END;
       ''');
 
-      // 创建外键约束 - 删除级联（当删除收藏夹时，同步删除相关历史记录）
+      // 创建外键约束 - 删除级联（当删除收藏夹时，将相关历史记录的收藏夹ID设为NULL）
       await db.execute('''
-        CREATE TRIGGER IF NOT EXISTS fk_clipboard_history_delete_cascade
+        CREATE TRIGGER IF NOT EXISTS fk_clipboard_history_delete_set_null
         AFTER DELETE ON favorite_folders
-        WHEN OLD.folder_name IN (SELECT DISTINCT favorite_type FROM clipboard_history WHERE favorite_type IS NOT NULL)
         BEGIN
-          DELETE FROM clipboard_history 
-          WHERE favorite_type = OLD.folder_name;
+          UPDATE clipboard_history 
+          SET favorite_folder_id = NULL
+          WHERE favorite_folder_id = OLD.folder_id;
         END;
       ''');
 
       // 创建索引提升查询效率（使用 try-catch 防止索引创建失败影响整体）
       final indexStatements = [
         'CREATE INDEX IF NOT EXISTS idx_update_time ON clipboard_history (update_time DESC)',
-        'CREATE INDEX IF NOT EXISTS idx_favorite_type ON clipboard_history (favorite_type)',
+        'CREATE INDEX IF NOT EXISTS idx_favorite_folder_id ON clipboard_history (favorite_folder_id)',
         'CREATE INDEX IF NOT EXISTS idx_folder_name ON favorite_folders (folder_name)',
         'CREATE INDEX IF NOT EXISTS idx_folder_sort ON favorite_folders (sort_num, folder_name)',
       ];
@@ -172,6 +173,7 @@ class ClipboardDatabase {
   Future<void> _insertDefaultFolders(Database db) async {
     try {
       // 默认文件夹配置
+      // 注意：第一个创建的收藏夹ID为1，作为默认收藏夹，不应被删除或重命名
       final defaultFolders = [
         {'folder_name': '默认收藏夹', 'sort_num': 1},
       ];

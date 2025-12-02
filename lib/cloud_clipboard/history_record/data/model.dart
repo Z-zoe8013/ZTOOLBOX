@@ -6,8 +6,8 @@ class ClipboardHistoryModel {
   /// 剪切板内容（核心字段）
   String content;
 
-  /// 收藏夹（关联收藏夹表 folder_id，允许为空）
-  String? favoriteType;
+  /// 收藏夹ID（关联收藏夹表 folder_id，允许为空）
+  int? favoriteFolderId;
 
   /// 记录更新时间（默认当前本地时间）
   DateTime updateTime;
@@ -16,7 +16,7 @@ class ClipboardHistoryModel {
   ClipboardHistoryModel({
     this.id,
     required this.content,
-    this.favoriteType,
+    this.favoriteFolderId,
     DateTime? updateTime,
   }) : updateTime = updateTime ?? DateTime.now();
 
@@ -25,7 +25,7 @@ class ClipboardHistoryModel {
     return ClipboardHistoryModel(
       id: map['id'] as int?,
       content: map['content'] as String,
-      favoriteType: map['favorite_type'] as String?,
+      favoriteFolderId: map['favorite_folder_id'] as int?,
       updateTime: DateTime.parse(map['update_time'] as String),
     );
   }
@@ -35,14 +35,14 @@ class ClipboardHistoryModel {
     return {
       'id': id,
       'content': content,
-      'favorite_type': favoriteType,
+      'favorite_folder_id': favoriteFolderId,
       'update_time': updateTime.toIso8601String(),
     };
   }
 
   @override
   String toString() {
-    return 'ClipboardHistoryModel{id: $id, content: $content, favoriteType: $favoriteType, updateTime: $updateTime}';
+    return 'ClipboardHistoryModel{id: $id, content: $content, favoriteFolderId: $favoriteFolderId, updateTime: $updateTime}';
   }
 }
 
