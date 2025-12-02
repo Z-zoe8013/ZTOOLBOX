@@ -3,13 +3,7 @@
 -已在小米手机完美使用
 
 -数据安全-上传到云的数据经过加密再上传，密钥仅在本地存储，建议设置密钥长度大于16位
-
-#应用预览图
-
-<img width="367" height="688" alt="image" src="https://github.com/user-attachments/assets/9ecd4de4-9c1c-464e-95c0-296a7f554594" />
-<img width="363" height="686" alt="image" src="https://github.com/user-attachments/assets/76d0c012-9160-4d43-be5e-37b1dd9bbfc5" />
-<img width="386" height="884" alt="image" src="https://github.com/user-attachments/assets/d067fbd3-057e-4d7f-b7be-20ba47bad7f1" />
-
+-支持历史剪切板记录存储
 
 
 
