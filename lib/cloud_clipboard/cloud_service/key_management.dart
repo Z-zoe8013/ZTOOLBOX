@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../common/prompt.dart';
+import 'package:ztoolbox/cloud_clipboard/common/prompt.dart';
 import 'cloud_service.dart';
-import '../common/glass_container.dart'; // 导入玻璃容器组件
+import 'package:ztoolbox/cloud_clipboard/common/glass_container.dart'; // 导入玻璃容器组件
 
 // 加密工具类
 class EncryptionUtils {
